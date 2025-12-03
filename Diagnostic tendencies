@@ -1,0 +1,152 @@
+# ------------------------------------------------------------------
+# Generic Bootstrap Partial-Effect Spline Plot
+# ------------------------------------------------------------------
+
+# Load required packages
+library(fixest)
+library(dplyr)
+library(ggplot2)
+library(splines)
+
+# ------------------------------------------------------------------
+# USER INPUT --------------------------------------------------------
+# ------------------------------------------------------------------
+
+# 1. Input dataset:
+data_input <- your_data_frame   # <-- replace with your dataset
+
+# 2. Treatment / instrument variables to profile using splines:
+var_list <- list(
+  list(var = "instrument1", label = "Instrument A"),
+  list(var = "instrument2", label = "Instrument B")
+)
+
+# 3. Outcome variable:
+outcome_var <- "your_outcome"
+
+# 4. Covariates (linear / categorical)
+covariates <- c(
+  "cov1", "cov2", "cov3",           # numeric covariates
+  "factor(cat1)", "factor(cat2)"    # factor covariates
+)
+
+# 5. Fixed effects specification
+fixed_effects <- "fe1^fe2^fe3"      # any FE structure fixest accepts
+
+# 6. Clustering variables
+cluster_vars <- c("cluster1", "cluster2")
+
+# 7. Number of bootstrap replications
+N_boot <- 200
+
+# 8. Number of spline knots
+n_knots <- 5
+
+# ------------------------------------------------------------------
+# DATA PREPROCESSING ------------------------------------------------
+# ------------------------------------------------------------------
+
+# keep complete cases for required variables
+needed_vars <- c(
+  outcome_var,
+  unlist(lapply(var_list, `[[`, "var")),
+  covariates,
+  unlist(strsplit(fixed_effects, "\\^")),
+  cluster_vars
+)
+
+data_used <- data_input %>%
+  select(all_of(needed_vars)) %>%
+  filter(complete.cases(.))
+
+# ------------------------------------------------------------------
+# FUNCTION TO RUN A SINGLE PROFILE ---------------------------------
+# ------------------------------------------------------------------
+
+profile_spline <- function(data, var, label) {
+  
+  # Percentile trimming
+  rng <- quantile(data[[var]], probs = c(0.10, 0.90), na.rm = TRUE)
+  preddata <- data[rep(1, 200), ]
+  preddata[[var]] <- seq(rng[1], rng[2], length.out = 200)
+  
+  res <- numeric(0)
+  
+  # Bootstrap loop
+  for (b in 1:N_boot) {
+    boot_data <- data[sample(nrow(data), replace = TRUE), ]
+    
+    # build formula dynamically
+    fmla <- reformulate(
+      paste0("ns(", var, ", ", n_knots, ")"),
+      response = outcome_var
+    )
+    
+    covars_plus <- paste(covariates, collapse = " + ")
+    fmla <- as.formula(
+      paste0(
+        outcome_var, " ~ ns(", var, ",", n_knots, ") + ",
+        covars_plus, " | ", fixed_effects
+      )
+    )
+    
+    mod <- feols(
+      fmla,
+      data = boot_data,
+      cluster = cluster_vars,
+      combine.quick = FALSE
+    )
+    
+    pred <- predict(mod, newdata = preddata)
+    baseline <- pred[round(length(pred)/4)]  # reference point
+    res <- c(res, pred - baseline)
+  }
+  
+  M <- matrix(res, nrow = 200)
+  df <- data.frame(
+    x = preddata[[var]],
+    m = apply(M, 1, median, na.rm = TRUE),
+    low = apply(M, 1, quantile, 0.025, na.rm = TRUE),
+    high = apply(M, 1, quantile, 0.975, na.rm = TRUE),
+    variable = label
+  )
+  
+  return(df)
+}
+
+# ------------------------------------------------------------------
+# RUN ALL INSTRUMENTS ----------------------------------------------
+# ------------------------------------------------------------------
+
+results <- bind_rows(
+  lapply(var_list, function(v) profile_spline(data_used, v$var, v$label))
+)
+
+# ------------------------------------------------------------------
+# PLOT --------------------------------------------------------------
+# ------------------------------------------------------------------
+
+p <- ggplot(results,
+            aes(x = x, y = m, ymin = low, ymax = high,
+                linetype = variable, fill = variable)) +
+  geom_ribbon(alpha = 0.15, colour = NA) +
+  geom_line(linewidth = 1.2) +
+  geom_hline(yintercept = 0, colour = "black", linewidth = 0.8) +
+  labs(
+    x = "Value of the Instrument",
+    y = "Estimated Effect (median & 95% CI)",
+    linetype = "Instrument",
+    fill = "Instrument"
+  ) +
+  scale_linetype_manual(values = c("dotted", "solid")) +
+  scale_fill_manual(values = c("gray40", "gray60")) +
+  theme_minimal(base_size = 18) +
+  theme(
+    legend.position = "bottom",
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.7)
+  )
+
+print(p)
+
+ggsave("spline_effect_plot.png", plot = p,
+       width = 12, height = 9, dpi = 600)
