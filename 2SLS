@@ -1,0 +1,85 @@
+# ------------------------------------------------------------------
+# Generic IV / Two-Stage Fixed-Effects Regression Template
+# ------------------------------------------------------------------
+
+# Load required packages
+library(fixest)
+library(dplyr)
+
+# ------------------------------------------------------------------
+# USER INPUT --------------------------------------------------------
+# ------------------------------------------------------------------
+
+# 1. Dataset
+data_input <- your_data_frame   # <-- replace with your dataset
+
+# 2. Outcome variable
+outcome_var <- "OUTCOME_VAR"    # placeholder for outcome
+
+# 3. Treatment / endogenous variable
+endog_var <- "ENDOG_VAR"        # placeholder for endogenous variable
+
+# 4. Instrument variable
+instrument_var <- "INSTRUMENT_VAR"  # placeholder for instrument
+
+# 5. Covariates (numeric or factor)
+covariates <- c(
+  "COVARIATE_1", "COVARIATE_2", "COVARIATE_3"  # placeholder covariates
+)
+
+# 6. Fixed effects (FE) structure, separated by ^
+fixed_effects <- "FE_1^FE_2^FE_3"   # placeholder fixed effects
+
+# 7. Clustering variables
+cluster_vars <- c("CLUSTER_1", "CLUSTER_2")  # placeholder cluster variables
+
+# 8. Optional: Subset condition
+subset_condition <- expression(SUBSET_CONDITION)  # placeholder logical filter
+
+# ------------------------------------------------------------------
+# PREPARE DATA ------------------------------------------------------
+# ------------------------------------------------------------------
+
+data_used <- data_input %>%
+  filter(eval(subset_condition)) %>%
+  select(all_of(c(outcome_var, endog_var, instrument_var, covariates, 
+                  unlist(strsplit(fixed_effects, "\\^")), cluster_vars))) %>%
+  filter(complete.cases(.))
+
+# ------------------------------------------------------------------
+# BUILD FORMULA -----------------------------------------------------
+# ------------------------------------------------------------------
+
+# 1. Main regression formula with covariates and FE
+main_fmla <- as.formula(
+  paste0(
+    outcome_var, " ~ 1 + ", paste(covariates, collapse = " + "), 
+    " | ", fixed_effects
+  )
+)
+
+# 2. IV specification (endogenous ~ instrument)
+iv_fmla <- as.formula(
+  paste0(endog_var, " ~ ", instrument_var)
+)
+
+# 3. Full FEOLS formula with IV
+full_fmla <- paste0(
+  deparse(main_fmla), " | ", deparse(iv_fmla)
+)
+
+# ------------------------------------------------------------------
+# RUN IV / FEOLS REGRESSION ---------------------------------------
+# ------------------------------------------------------------------
+
+mod <- feols(
+  formula = as.formula(full_fmla),
+  data = data_used,
+  cluster = cluster_vars
+)
+
+# ------------------------------------------------------------------
+# RESULTS -----------------------------------------------------------
+# ------------------------------------------------------------------
+
+summary(mod)
