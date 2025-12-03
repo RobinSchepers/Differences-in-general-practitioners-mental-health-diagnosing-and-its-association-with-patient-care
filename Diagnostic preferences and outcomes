@@ -1,0 +1,72 @@
+# ------------------------------------------------------------------
+# Generic Fixed-Effects Regression Template
+# ------------------------------------------------------------------
+
+# Load required packages
+library(fixest)
+library(dplyr)
+
+# ------------------------------------------------------------------
+# USER INPUT --------------------------------------------------------
+# ------------------------------------------------------------------
+
+# 1. Dataset
+data_input <- your_data_frame   # <-- replace with your dataset
+
+# 2. Outcome variable
+outcome_var <- "OUTCOME_VAR"    # placeholder for outcome
+
+# 3. Treatment / instrument variable
+treatment_var <- "TREATMENT_VAR"  # placeholder for main variable of interest
+
+# 4. Covariates (numeric or factor)
+covariates <- c(
+  "COVARIATE_1", "COVARIATE_2", "COVARIATE_3"  # placeholder covariates
+)
+
+# 5. Fixed effects (FE) structure, separated by ^
+fixed_effects <- "FE_1^FE_2^FE_3"   # placeholder fixed effects
+
+# 6. Clustering variables
+cluster_vars <- c("CLUSTER_1", "CLUSTER_2")  # placeholder cluster variables
+
+# 7. Optional: Subset condition
+subset_condition <- expression(SUBSET_CONDITION)  # placeholder logical filter
+
+# ------------------------------------------------------------------
+# PREPARE DATA ------------------------------------------------------
+# ------------------------------------------------------------------
+
+data_used <- data_input %>%
+  filter(eval(subset_condition)) %>%
+  select(all_of(c(outcome_var, treatment_var, covariates, 
+                  unlist(strsplit(fixed_effects, "\\^")), cluster_vars))) %>%
+  filter(complete.cases(.))
+
+# ------------------------------------------------------------------
+# BUILD FORMULA -----------------------------------------------------
+# ------------------------------------------------------------------
+
+# Dynamically construct formula
+fmla <- as.formula(
+  paste0(
+    outcome_var, " ~ ", treatment_var, " + ", paste(covariates, collapse = " + "), 
+    " | ", fixed_effects
+  )
+)
+
+# ------------------------------------------------------------------
+# RUN REGRESSION ----------------------------------------------------
+# ------------------------------------------------------------------
+
+mod <- feols(
+  fmla,
+  data = data_used,
+  cluster = cluster_vars
+)
+
+# ------------------------------------------------------------------
+# RESULTS -----------------------------------------------------------
+# ------------------------------------------------------------------
+
+summary(mod)
