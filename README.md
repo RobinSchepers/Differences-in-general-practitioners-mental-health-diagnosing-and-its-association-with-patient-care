@@ -43,9 +43,9 @@ These scripts cover three main types of analyses:
 
 | Script Name | Description |
 |------------|-------------|
-| `generic_feols.R` | Standard fixed-effects regression template. Placeholder variables for outcome, treatment, covariates, FE, cluster, and subset. |
-| `generic_iv_feols.R` | Instrumental variable regression template with placeholders for endogenous variable, instrument, covariates, FE, cluster, and subset. |
-| `generic_spline_bootstrap.R` | Bootstrap spline analysis template for continuous instruments. Produces plots with median and 95% CI. Fully parameterized with placeholders. |
+| `Diagnostic tendencies` | Standard fixed-effects regression template. Placeholder variables for outcome, treatment, covariates, FE, cluster, and subset. |
+| `Diagnostic preferences and outcomes` | Bootstrap spline analysis template for continuous instruments. Produces plots with median and 95% CI. Fully parameterized with placeholders. |
+| `2SLS` | Instrumental variable regression template with placeholders for endogenous variable, instrument, covariates, FE, cluster, and subset. |
 
 ---
 
